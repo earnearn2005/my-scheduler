@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ระบบจัดตารางเรียน - AI Scheduler</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; }
+        
+        /* Navbar */
+        .navbar-custom { background: linear-gradient(90deg, #0052D4 0%, #4364F7 50%, #6FB1FC 100%); color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .navbar-custom .navbar-brand { color: white !important; font-weight: 600; font-size: 1.1rem; }
+        .navbar-custom .btn-logout { border-color: rgba(255,255,255,0.5); color: white; font-size: 0.8rem; }
+        
+        .main-wrapper { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        /* Timetable Box */
+        .timetable-section { background: white; border-radius: 0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 40px; padding: 20px; width: 100%; page-break-inside: avoid; page-break-after: always; }
+
+        /* Header Layout */
+        .report-container { border: 1px solid #000; }
+        .header-container { display: flex; border-bottom: 1px solid #000; }
+        .header-info-box { width: 30%; border-right: 1px solid #000; padding: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .logo-box { width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+        .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .info-text h4 { margin: 0; font-weight: bold; font-size: 12px; }
+        .info-text p { margin: 0; font-size: 10px; line-height: 1.2; }
+
+        .header-summary-box { width: 70%; padding: 0; }
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 9px; }
+        .summary-table th, .summary-table td { border: 1px solid #000; border-top: none; border-right: none; padding: 0 2px; text-align: center; height: 14px; }
+        .border-mid { border-right: 2px solid #000 !important; }
+        .summary-table th { background-color: #f0f0f0; font-weight: bold; }
+        .text-left { text-align: left !important; padding-left: 4px !important; }
+        .bg-total { background-color: #f9f9f9; font-weight: bold; }
+
+        /* Scheduler Table */
+        .scheduler-table { table-layout: fixed; width: 100%; border-collapse: collapse; font-size: 10px; border-bottom: 1px solid #000; /* ปิดเส้นตารางด้านล่างให้ชัดเจน */ }
+        .scheduler-table th, .scheduler-table td { border: 1px solid #000; padding: 0; text-align: center; vertical-align: top; }
+        
+        /* Header Colors */
+        .scheduler-table th { background-color: #89CFF0; color: #2c3e50; height: 25px; vertical-align: middle; font-size: 9px; font-weight: 600; }
+        .scheduler-table th[style*="background:#ddd"] { background-color: #A0D8F3 !important; color: #2c3e50 !important; }
+        
+        .col-day { background-color: #d9eefd; color: #2c3e50; font-weight: bold; vertical-align: middle !important; font-size: 9px; }
+
+        /* Cells */
+        .scheduler-table td { height: 50px; background-color: white; }
+        .class-item { display: flex; flex-direction: column; justify-content: center; height: 100%; width: 100%; font-size: 9px; line-height: 1.3; padding: 2px; color: black; overflow: hidden; }
+        .ci-code { font-weight: bold; font-size: 10px; }
+        .ci-detail { font-size: 9px; }
+
+        .bg-single { background-color: #ffffff; }
+        .bg-multi { background-color: #cceeff; }
+        .bg-break { background-color: #f0f8ff; color: #666; vertical-align: middle !important; font-style: italic; font-size: 9px; }
+
+        .control-panel { margin-bottom: 20px; }
+        .btn-group-export .btn { font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
+
+        /* *** CSS ส่วนลายเซ็น (ปรับปรุง: แยกออกจากตารางชัดเจน) *** */
+        .signature-section {
+            display: none; /* ซ่อนในเว็บปกติ */
+            width: 100%;
+            margin-top: 40px; /* *** เว้นระยะห่างจากตาราง 40px *** */
+            font-family: 'Sarabun', sans-serif;
+            page-break-inside: avoid;
+        }
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end; 
+            padding: 0 10px;
+        }
+        .sign-item {
+            width: 23%; 
+            text-align: center;
+            font-size: 10px;
+        }
+        .sign-name { 
+            margin-top: 30px; /* เว้นที่สำหรับเซ็นชื่อ */
+            margin-bottom: 5px;
+        }
+        .sign-role { font-weight: bold; }
+
+        @media print {
+            @page { size: A4 landscape; margin: 4cm; }
+            body { background-color: white; -webkit-print-color-adjust: exact; margin: 0; padding: 0; width: 100%; }
+            .no-print { display: none !important; }
+            .main-wrapper { max-width: 100%; padding: 0; margin: 0; }
+            
+            .timetable-section { 
+                width: 100% !important; margin: 0; padding: 0; 
+                box-shadow: none; border: none; /* เอาขอบใหญ่ออก */
+                page-break-after: always; 
+            }
+            .report-container { border: 2px solid #000; width: 100%; }
+            
+            .scheduler-table td { height: 11mm !important; font-size: 9px; }
+            .scheduler-table th { height: 6mm !important; font-size: 8px; background-color: #89CFF0 !important; color: #2c3e50 !important; }
+            .col-day { background-color: #d9eefd !important; color: #2c3e50 !important; }
+            
+            /* แสดงลายเซ็นตอน Print */
+            .signature-section { display: block !important; }
+            
+            .bg-multi { background-color: #cceeff !important; }
+            .bg-single { background-color: #ffffff !important; }
+            .navbar-custom { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-custom px-4 shadow-sm no-print">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="fas fa-calendar-alt me-2"></i>ระบบจัดตารางสอน AI</a>
+            <a href="/logout" class="btn btn-logout btn-sm btn-outline-light">ออกจากระบบ</a>
+        </div>
+    </nav>
+
+    <div class="main-wrapper mt-4">
+        <div class="card shadow-sm mb-4 border-0 no-print control-panel">
+            <div class="card-body bg-white rounded p-3">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-muted small">1. โหมดการแสดงผล</label>
+                        <div class="btn-group w-100 btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="viewMode" id="modeGroup" value="group" checked onchange="updateSubFilter('group')">
+                            <label class="btn btn-outline-primary" for="modeGroup"><i class="fas fa-users me-1"></i> กลุ่มเรียน</label>
+                            <input type="radio" class="btn-check" name="viewMode" id="modeTeacher" value="teacher" onchange="updateSubFilter('teacher')">
+                            <label class="btn btn-outline-success" for="modeTeacher"><i class="fas fa-chalkboard-teacher me-1"></i> ครูผู้สอน</label>
+                            <input type="radio" class="btn-check" name="viewMode" id="modeRoom" value="room" onchange="updateSubFilter('room')">
+                            <label class="btn btn-outline-warning" for="modeRoom"><i class="fas fa-door-open me-1"></i> ห้องเรียน</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-muted small">2. เลือกข้อมูล (แสดงทันที)</label>
+                        <select id="subFilter" class="form-select form-select-sm" onchange="generateSchedule()">
+                            <option value="all">-- ทั้งหมด (พิมพ์ทีเดียว) --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex gap-2">
+                                <button onclick="generateSchedule()" class="btn btn-primary flex-grow-1 fw-bold btn-sm shadow-sm"><i class="fas fa-play"></i> จัดตาราง</button>
+                                <button onclick="clearSchedule()" class="btn btn-danger btn-sm shadow-sm"><i class="fas fa-stop"></i> ล้าง</button>
+                                <button onclick="window.print()" class="btn btn-secondary btn-sm shadow-sm"><i class="fas fa-print"></i> พิมพ์</button>
+                            </div>
+                            <div class="btn-group btn-group-export w-100 shadow-sm" role="group">
+                                <button onclick="exportToPDF()" class="btn btn-outline-danger" title="บันทึกเป็น PDF"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button onclick="exportToExcel()" class="btn btn-outline-success" title="บันทึกเป็น Excel"><i class="fas fa-file-excel"></i> Excel</button>
+                                <button onclick="exportToCSV()" class="btn btn-outline-primary" title="บันทึกเป็น CSV"><i class="fas fa-file-csv"></i> CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="statusArea" class="no-print"></div>
+        <div id="tablesContainer"><div class="text-center text-muted py-5 no-print"><i class="fas fa-file-invoice fa-3x mb-3 text-secondary" style="opacity: 0.3;"></i><p class="small">ระบบพร้อมทำงาน</p></div></div>
+    </div>
+
+    <script>
+        const masterData = { groups: <%- JSON.stringify(dropdownData.groups) %>, teachers: <%- JSON.stringify(dropdownData.teachers) %>, rooms: <%- JSON.stringify(dropdownData.rooms) %> };
+        let rawScheduleData = [];
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+        const dayNames = { 'Mon': 'จันทร์', 'Tue': 'อังคาร', 'Wed': 'พุธ', 'Thu': 'พฤหัส', 'Fri': 'ศุกร์' };
+
+        updateSubFilter('group');
+
+        function updateSubFilter(mode) {
+            const select = document.getElementById('subFilter');
+            select.innerHTML = '<option value="all">-- ทั้งหมด (พิมพ์ทีเดียว) --</option>';
+            let list = [];
+            if (mode === 'group') list = masterData.groups.map(g => ({id: g.group_id, name: `${g.group_id} : ${g.group_name}`}));
+            else if (mode === 'teacher') list = masterData.teachers.map(t => ({id: t.teacher_id, name: t.teacher_name}));
+            else if (mode === 'room') list = masterData.rooms.map(r => ({id: r.room_id, name: `${r.room_id} (${r.room_name})`}));
+            list.forEach(item => { let opt = document.createElement('option'); opt.value = item.id; opt.innerText = item.name; select.appendChild(opt); });
+        }
+
+        function clearSchedule() {
+            document.getElementById('tablesContainer').innerHTML = `<div class="text-center text-muted py-5 no-print"><i class="fas fa-check-circle fa-3x mb-3 text-success" style="opacity:0.5;"></i><p class="small">ล้างข้อมูลเรียบร้อย</p></div>`;
+            document.getElementById('statusArea').innerHTML = '';
+        }
+
+        async function generateSchedule() {
+            const statusArea = document.getElementById('statusArea');
+            const container = document.getElementById('tablesContainer');
+            const mode = document.querySelector('input[name="viewMode"]:checked').value;
+            const targetId = document.getElementById('subFilter').value;
+
+            if (rawScheduleData.length === 0) {
+                statusArea.innerHTML = '<div class="alert alert-warning text-center small py-2">กำลังจัดตาราง...</div>';
+                try { const res = await fetch('/api/generate-schedule'); rawScheduleData = await res.json(); } catch (err) { statusArea.innerHTML = '<div class="alert alert-danger small py-2">Error</div>'; return; }
+            }
+
+            statusArea.innerHTML = ''; container.innerHTML = ''; 
+            let entitiesToRender = [];
+            if (targetId !== 'all') {
+                if (mode === 'group') entitiesToRender = masterData.groups.filter(g => g.group_id === targetId);
+                else if (mode === 'teacher') entitiesToRender = masterData.teachers.filter(t => t.teacher_id === targetId);
+                else if (mode === 'room') entitiesToRender = masterData.rooms.filter(r => r.room_id === targetId);
+            } else {
+                if (mode === 'group') entitiesToRender = masterData.groups;
+                else if (mode === 'teacher') entitiesToRender = masterData.teachers;
+                else if (mode === 'room') entitiesToRender = masterData.rooms;
+            }
+
+            if (entitiesToRender.length === 0) { container.innerHTML = '<div class="alert alert-warning small">ไม่พบข้อมูล</div>'; return; }
+
+            entitiesToRender.forEach(entity => {
+                let entityId = mode === 'group' ? entity.group_id : (mode === 'teacher' ? entity.teacher_id : entity.room_id);
+                const mySchedule = rawScheduleData.filter(row => {
+                    if (mode === 'group') return row.group_id === entityId;
+                    if (mode === 'teacher') return row.teacher_id === entityId;
+                    return row.room_id === entityId;
+                });
+                const tableHtml = createTableHTML(entity, mySchedule, mode);
+                const section = document.createElement('div');
+                section.className = 'timetable-section';
+                section.innerHTML = tableHtml;
+                container.appendChild(section);
+            });
+        }
+
+        function createTableHTML(entity, data, mode) {
+            let headerLogo = '<img src="/img/2.png" alt="Logo">';
+            let semester = "ภาคเรียนที่ 2/2568";
+            let line1 = "", line2 = "";
+            if (mode === 'group') { line1=`กลุ่มเรียน: ${entity.group_name}`; line2=`ครูที่ปรึกษา: ${entity.advisor||'-'}`; }
+            else if (mode === 'teacher') { line1=`ครูผู้สอน: ${entity.teacher_name}`; line2=`ตำแหน่ง: ${entity.role||'-'}`; }
+            else { line1=`ห้องเรียน: ${entity.room_name}`; line2=`ประเภท: ${entity.room_type}`; }
+
+            // Summary Split Logic (Fill Left First)
+            const uniqueSubjects = {};
+            data.forEach(item => { if (!uniqueSubjects[item.subject_id]) uniqueSubjects[item.subject_id] = { id: item.subject_id, name: item.subject_name, theory: item.theory||0, practice: item.practice||0, credit: item.credit||0, hours: (item.theory||0)+(item.practice||0) }; });
+            const subjects = Object.values(uniqueSubjects);
+            
+            const maxRowsPerSide = 7; 
+            const leftSubjects = subjects.slice(0, maxRowsPerSide);
+            const rightSubjects = subjects.slice(maxRowsPerSide);
+            const rowCount = Math.max(maxRowsPerSide, rightSubjects.length);
+
+            let sumL={t:0,p:0,c:0,h:0}, sumR={t:0,p:0,c:0,h:0};
+            let rowsHtml = '';
+            for(let i=0; i<rowCount; i++) {
+                const sl = leftSubjects[i] || null;
+                const sr = rightSubjects[i] || null;
+                const seqR = sr ? (leftSubjects.length + i + 1) : '';
+                if(sl){ sumL.t+=sl.theory; sumL.p+=sl.practice; sumL.c+=sl.credit; sumL.h+=sl.hours; }
+                if(sr){ sumR.t+=sr.theory; sumR.p+=sr.practice; sumR.c+=sr.credit; sumR.h+=sr.hours; }
+                rowsHtml += `<tr>
+                    <td>${sl?i+1:''}</td><td>${sl?sl.id:''}</td><td class="text-left">${sl?sl.name:''}</td><td>${sl?sl.theory:''}</td><td>${sl?sl.practice:''}</td><td>${sl?sl.credit:''}</td><td class="border-mid">${sl?sl.hours:''}</td>
+                    <td>${seqR}</td><td>${sr?sr.id:''}</td><td class="text-left">${sr?sr.name:''}</td><td>${sr?sr.theory:''}</td><td>${sr?sr.practice:''}</td><td>${sr?sr.credit:''}</td><td>${sr?sr.hours:''}</td>
+                </tr>`;
+            }
+            const gT = { t:sumL.t+sumR.t, p:sumL.p+sumR.p, c:sumL.c+sumR.c, h:sumL.h+sumR.h };
+            const summaryHtml = rowsHtml + 
+                `<tr class="bg-total"><td colspan="3" class="text-end">รวม</td><td>${sumL.t}</td><td>${sumL.p}</td><td>${sumL.c}</td><td class="border-mid">${sumL.h}</td><td colspan="3" class="text-end">รวม</td><td>${sumR.t}</td><td>${sumR.p}</td><td>${sumR.c}</td><td>${sumR.h}</td></tr>` +
+                `<tr class="bg-total"><td colspan="10" class="text-end border-mid">รวมทั้งหมด (Grand Total)</td><td>${gT.t}</td><td>${gT.p}</td><td>${gT.c}</td><td>${gT.h}</td></tr>`;
+
+            let html = `
+                <div class="report-container">
+                    <div class="header-container"><div class="header-info-box"><div class="logo-box">${headerLogo}</div><div class="info-text"><h4>วิทยาลัยเทคนิค...</h4><p>${semester}</p><p>${line1}</p><p>${line2}</p></div></div><div class="header-summary-box"><table class="summary-table"><thead><tr><th width="3%">ที่</th><th width="10%">รหัส</th><th width="27%">ชื่อวิชา</th><th width="3%">ท</th><th width="3%">ป</th><th width="3%">น</th><th width="3%" class="border-mid">ช</th><th width="3%">ที่</th><th width="10%">รหัส</th><th width="27%">ชื่อวิชา</th><th width="3%">ท</th><th width="3%">ป</th><th width="3%">น</th><th width="3%">ช</th></tr></thead><tbody>${summaryHtml}</tbody></table></div></div>
+                    <table class="scheduler-table"><thead><tr><th class="col-day">วัน</th><th>08:00<br>09:00<br>1</th><th>09:00<br>10:00<br>2</th><th>10:00<br>11:00<br>3</th><th>11:00<br>12:00<br>4</th><th style="background:#ddd; color:black;">12:00<br>13:00<br>พัก</th><th>13:00<br>14:00<br>6</th><th>14:00<br>15:00<br>7</th><th>15:00<br>16:00<br>8</th><th>16:00<br>17:00<br>9</th><th>17:00<br>18:00<br>10</th><th>18:00<br>19:00<br>11</th><th>19:00<br>20:00<br>12</th></tr></thead><tbody>`;
+
+            days.forEach(day => {
+                html += `<tr><td class="col-day">${dayNames[day]}</td>`;
+                let skip = 0;
+                for (let p = 1; p <= 12; p++) {
+                    if (skip > 0) { skip--; continue; }
+                    if (p === 5) { html += `<td class="bg-break">พักเที่ยง</td>`; continue; }
+                    const classes = data.filter(d => d.day === day && d.period === p);
+                    if (classes.length > 0) {
+                        const cls = classes[0];
+                        let duration = 1;
+                        for(let k=1; k<4; k++) {
+                            const next = data.find(d => d.day === day && d.period === p+k && d.subject_id === cls.subject_id);
+                            if(next) duration++; else break;
+                        }
+                        skip = duration - 1;
+                        const bgClass = (duration > 1) ? 'bg-multi' : 'bg-single';
+                        
+                        // ปรับข้อมูลตามโหมด (ตัดชื่อวิชาออก)
+                        let cellContent = '';
+                        if (mode === 'group') {
+                            cellContent = `<div class="ci-code">${cls.subject_id}</div><div class="ci-detail">${cls.teacher}</div><div class="ci-detail">${cls.room}</div>`;
+                        } else if (mode === 'teacher') {
+                            cellContent = `<div class="ci-code">${cls.subject_id}</div><div class="ci-detail">${cls.group_name}</div><div class="ci-detail">${cls.room}</div>`;
+                        } else {
+                            cellContent = `<div class="ci-code">${cls.subject_id}</div><div class="ci-detail">${cls.teacher}</div><div class="ci-detail">${cls.group_name}</div>`;
+                        }
+
+                        html += `<td colspan="${duration}"><div class="class-item ${bgClass}">${cellContent}</div></td>`;
+                    } else { html += `<td></td>`; }
+                }
+                html += `</tr>`;
+            });
+            
+            // *** ลายเซ็น (อยู่นอกตาราง + ไม่มีเส้นขีด) ***
+            html += `</tbody></table>
+            <div class="signature-section">
+                <div class="signature-row">
+                    <div class="sign-item">
+                        <div class="sign-name">(............................................)</div>
+                        <div class="sign-role">หัวหน้าแผนกวิชา</div>
+                    </div>
+                    <div class="sign-item">
+                        <div class="sign-name">(............................................)</div>
+                        <div class="sign-role">หัวหน้างานพัฒนาหลักสูตรฯ</div>
+                    </div>
+                    <div class="sign-item">
+                        <div class="sign-name">(............................................)</div>
+                        <div class="sign-role">รองผู้อำนวยการฝ่ายวิชาการ</div>
+                    </div>
+                    <div class="sign-item">
+                        <div class="sign-name">(............................................)</div>
+                        <div class="sign-role">ผู้อำนวยการ</div>
+                    </div>
+                </div>
+            </div>`;
+            
+            html += `</div>`;
+            return html;
+        }
+
+        function exportToPDF() {
+            const element = document.getElementById('tablesContainer');
+            if (!element || element.innerText.includes('พร้อมทำงาน')) { alert('กรุณากดจัดตารางก่อนทำการ Export PDF'); return; }
+            
+            const signs = document.querySelectorAll('.signature-section');
+            signs.forEach(s => s.style.display = 'block');
+
+            const opt = { margin: 5, filename: 'timetable.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
+            
+            const btn = document.querySelector('.btn-group-export .btn-outline-danger');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังสร้าง...';
+            
+            html2pdf().set(opt).from(element).save().then(() => { 
+                btn.innerHTML = originalText;
+                signs.forEach(s => s.style.display = 'none');
+            });
+        }
+
+        function exportToExcel() {
+            const sections = document.querySelectorAll('.timetable-section');
+            if (sections.length === 0) { alert('กรุณากดจัดตารางก่อนทำการ Export Excel'); return; }
+            const wb = XLSX.utils.book_new();
+            sections.forEach((section, index) => {
+                const summaryTable = section.querySelector('.summary-table');
+                const schedulerTable = section.querySelector('.scheduler-table');
+                let ws = XLSX.utils.table_to_sheet(summaryTable, {raw:true});
+                XLSX.utils.sheet_add_dom(ws, schedulerTable, {origin: -1});
+                
+                let sheetName = `Sheet ${index + 1}`;
+                const titleP = section.querySelector('.info-text p:nth-child(2)');
+                if (titleP) {
+                    const parts = titleP.innerText.split(':');
+                    sheetName = (parts.length > 1 ? parts[1] : titleP.innerText).trim().replace(/[\\/?*[\]]/g, "").substring(0, 30);
+                }
+                if (wb.SheetNames.includes(sheetName)) sheetName = `${sheetName} (${index})`;
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            });
+            XLSX.writeFile(wb, 'Timetable_Layout.xlsx');
+        }
+
+        function exportToCSV() {
+            if (rawScheduleData.length === 0) { alert('กรุณากดจัดตารางก่อนทำการ Export CSV'); return; }
+            let csv = "data:text/csv;charset=utf-8,Group,Subject,Teacher,Room,Day,Period\r\n";
+            rawScheduleData.forEach(i => csv += `${i.group_name},"${i.subject_name}",${i.teacher},${i.room},${i.day},${i.period}\r\n`);
+            const link = document.createElement("a"); link.href = encodeURI(csv); link.download = "timetable.csv"; link.click();
+        }
+    </script>
+</body>
+</html>
