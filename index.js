@@ -8,7 +8,7 @@ const csv = require('csv-parser');
 const db = require('./database');
 
 const app = express();
-const PORT = 3000;
+const PORT = 80;
 
 // Config
 app.set('view engine', 'ejs');
