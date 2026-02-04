@@ -26,6 +26,7 @@ const dataStore = {
     teaches: [], timeslots: [], registers: [], subjects: []
 };
 
+//Test CI/CD
 // CSV Loader
 const loadCSV = (fileName) => {
     return new Promise((resolve, reject) => {
